@@ -8,7 +8,7 @@
 // BOB'S CONFIGURATION (Targeting Alice)
 // ======================================================================
 // This is Alice's MAC Address! Bob will now shoot his replies straight to her.
-uint8_t peerAddress[] = {0xC4, 0xDE, 0xE2, 0x19, 0x54, 0x68}; 
+uint8_t peerAddress[] = {0x30, 0xC9, 0x22, 0x28, 0x36, 0x54}; 
 // ======================================================================
 
 // Security Keys (Must match Alice perfectly)

@@ -9,7 +9,7 @@
 // ======================================================================
 // If uploading to ALICE, put BOB'S MAC Address here.
 // If uploading to BOB, put ALICE'S MAC Address here.
-uint8_t peerAddress[] = {0x30, 0xC9, 0x22, 0x28, 0x36, 0x54}; 
+uint8_t peerAddress[] = {0x88, 0x13, 0xBF, 0x00, 0x94, 0xB0}; 
 // ======================================================================
 
 // Security Keys

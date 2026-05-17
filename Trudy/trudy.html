@@ -20,14 +20,15 @@
     .txt-intercept { color: #00ff41; }
     .txt-attack { color: #ff003c; font-weight: bold; }
     .txt-err { color: #ff9f1c; }
+    .txt-vuln { color: #ff003c; font-weight: bold; }
+    .txt-sec { color: #ff9f1c; font-weight: bold; }
   </style>
 </head>
 <body>
-  <h1>TRUDY // REPLAY ATTACK NODE</h1>
+  <h1>TRUDY // PASSIVE SNIFFER NODE</h1>
   
   <div>
-    <button class="btn" id="connectBtn" onclick="connectSerial()">[ 1. BIND TO USB RADIO ]</button>
-    <button class="btn btn-attack" onclick="launchAttack()">[ 2. LAUNCH REPLAY ATTACK ]</button>
+    <button class="btn" id="connectBtn" onclick="connectSerial()">[ BIND TO USB RADIO ]</button>
   </div>
 
   <div class="display-box" id="display">
@@ -63,10 +64,11 @@
           
           for (let line of lines) {
             if (line.trim() !== "") {
-              let cssClass = "txt-intercept";
+              let cssClass = "txt-sys";
               if (line.includes("[ATTACK]")) cssClass = "txt-attack";
               else if (line.includes("[ERROR]")) cssClass = "txt-err";
-              else if (line.includes("[SYSTEM]")) cssClass = "txt-sys";
+              else if (line.includes("SYSTEM_READY") || line.includes("ENGAGED") || line.includes("WAITING FOR DATA")) cssClass = "txt-sys";
+              else if (line.includes("[INTERCEPT]")) cssClass = "txt-intercept";
               
               appendLog(line, cssClass);
             }
@@ -75,18 +77,6 @@
       } catch (error) {
         appendLog("FATAL ERROR: " + error, "txt-err");
       }
-    }
-
-    async function launchAttack() {
-      if (!writer) {
-        alert("CRITICAL: Bind to USB Radio first!");
-        return;
-      }
-      
-      // Physically send the "REPLAY" string down the USB cable to trigger the C++ function
-      const command = "REPLAY\n";
-      const encoder = new TextEncoder();
-      await writer.write(encoder.encode(command));
     }
 
     function appendLog(text, className) {

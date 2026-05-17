@@ -1,0 +1,133 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <title>Alice's Terminal</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #0d1b2a; color: #e0e1dd; padding: 20px; text-align: center; }
+    h1 { color: #00b4d8; letter-spacing: 2px; }
+    .display-box { background-color: #1b263b; height: 350px; width: 90%; max-width: 700px; margin: 20px auto; overflow-y: auto; text-align: left; padding: 15px; border-radius: 8px; border: 1px solid #415a77; font-family: monospace; box-shadow: inset 0 0 10px #000; }
+    .input-box { padding: 10px; font-size: 16px; width: 60%; max-width: 400px; border-radius: 5px; border: none; }
+    .btn { padding: 12px 20px; background-color: #00b4d8; border: none; color: white; cursor: pointer; border-radius: 5px; font-weight: bold; transition: 0.3s; }
+    .btn:hover { background-color: #0077b6; }
+    .btn-connect { background-color: #ff9f1c; display: block; margin: 0 auto 20px auto; width: 250px; }
+    
+    /* Toggle Switch CSS */
+    .switch-container { margin: 20px; font-size: 18px; font-weight: bold; display: flex; justify-content: center; align-items: center; gap: 10px; }
+    .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e63946; transition: .4s; border-radius: 34px; }
+    .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+    input:checked + .slider { background-color: #4CAF50; }
+    input:checked + .slider:before { transform: translateX(26px); }
+    #modeLabel { color: #e63946; }
+
+    /* Terminal Text Colors */
+    .txt-sys { color: #778da9; }
+    .txt-sent { color: #ffffff; }
+    .txt-vuln { color: #e63946; font-weight: bold; }
+    .txt-sec { color: #4CAF50; font-weight: bold; }
+    .txt-err { color: #ff9f1c; font-weight: bold; text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <h1>ALICE'S SECURE TERMINAL</h1>
+  
+  <button class="btn btn-connect" id="connectBtn" onclick="connectSerial()">[ CONNECT TO USB PORT ]</button>
+
+  <div class="switch-container">
+    <span>Vulnerable Mode</span>
+    <label class="switch">
+      <input type="checkbox" id="modeSwitch" onchange="updateLabel()">
+      <span class="slider"></span>
+    </label>
+    <span id="modeLabel">Protection OFF</span>
+  </div>
+
+  <div class="display-box" id="display">
+    <span class="txt-sys">> Waiting for USB Connection...</span><br>
+  </div>
+
+  <input type="text" id="msgInput" class="input-box" placeholder="Type message (max 16 chars)..." maxlength="16">
+  <button class="btn" onclick="sendMessage()">SEND DATA</button>
+
+  <script>
+    let port;
+    let writer;
+    let displayBox = document.getElementById('display');
+
+    function updateLabel() {
+      let isSecure = document.getElementById('modeSwitch').checked;
+      let label = document.getElementById('modeLabel');
+      if(isSecure) { label.innerText = "Protection ON (AES+HMAC)"; label.style.color = "#4CAF50"; } 
+      else { label.innerText = "Protection OFF"; label.style.color = "#e63946"; }
+    }
+
+    async function connectSerial() {
+      try {
+        port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 115200 });
+        
+        writer = port.writable.getWriter();
+        document.getElementById('connectBtn').style.display = 'none';
+        
+        appendLog("USB CONNECTION ESTABLISHED. System Ready.", "txt-sys");
+
+        const textDecoder = new TextDecoderStream();
+        const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+        const reader = textDecoder.readable.getReader();
+        let buffer = "";
+        
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) { reader.releaseLock(); break; }
+          
+          buffer += value;
+          let lines = buffer.split('\n');
+          buffer = lines.pop(); 
+          
+          for (let line of lines) {
+            if (line.trim() !== "") {
+              // Color code the incoming data from the ESP32
+              let cssClass = "txt-sys";
+              if (line.includes("[VULNERABLE]")) cssClass = "txt-vuln";
+              else if (line.includes("[SECURE]")) cssClass = "txt-sec";
+              else if (line.includes("[ERROR]")) cssClass = "txt-err";
+              
+              appendLog(line, cssClass);
+            }
+          }
+        }
+      } catch (error) {
+        appendLog("ERROR: " + error, "txt-err");
+      }
+    }
+
+    async function sendMessage() {
+      if (!writer) {
+        alert("Please connect to the USB Port first!");
+        return;
+      }
+      
+      let text = document.getElementById('msgInput').value;
+      if (!text) return;
+      
+      let isSecure = document.getElementById('modeSwitch').checked;
+      let prefix = isSecure ? "SECU" : "VULN";
+      let modeText = isSecure ? "SECURE" : "VULNERABLE";
+      
+      appendLog(`YOU SENT: ${text} (${modeText})`, "txt-sent");
+      document.getElementById('msgInput').value = ""; 
+
+      // Send the formatted command (e.g., "VULN:HELLO\n") directly down the USB cable
+      const command = prefix + ":" + text + "\n";
+      const encoder = new TextEncoder();
+      await writer.write(encoder.encode(command));
+    }
+
+    function appendLog(text, className) {
+      displayBox.innerHTML += `<span class="${className}">> ${text}</span><br>`;
+      displayBox.scrollTop = displayBox.scrollHeight;
+    }
+  </script>
+</body>
+</html>

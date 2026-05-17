@@ -1,0 +1,98 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <title>TRUDY // Replay Attack Node</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+    body { font-family: 'Share Tech Mono', monospace; background-color: #050505; color: #00ff41; padding: 20px; text-align: center; margin: 0; }
+    h1 { color: #00ff41; letter-spacing: 3px; text-shadow: 0 0 15px rgba(0, 255, 65, 0.6); border-bottom: 1px solid #00ff41; padding-bottom: 15px; }
+    
+    .display-box { background-color: #0a0a0a; height: 400px; width: 95%; max-width: 900px; margin: 20px auto; overflow-y: auto; text-align: left; padding: 20px; border-radius: 2px; border: 1px solid #00ff41; box-shadow: inset 0 0 20px rgba(0, 20, 0, 0.9); font-size: 15px; line-height: 1.6; }
+    
+    .btn { padding: 15px 30px; background-color: transparent; border: 2px solid #00ff41; color: #00ff41; cursor: pointer; border-radius: 2px; font-weight: bold; font-family: inherit; font-size: 16px; transition: 0.3s; margin: 10px; width: 350px; }
+    .btn:hover { background-color: #00ff41; color: #000; box-shadow: 0 0 20px #00ff41; }
+    
+    .btn-attack { border-color: #ff003c; color: #ff003c; text-shadow: 0 0 5px rgba(255, 0, 60, 0.5); box-shadow: 0 0 10px rgba(255, 0, 60, 0.2); }
+    .btn-attack:hover { background-color: #ff003c; color: #fff; box-shadow: 0 0 30px #ff003c; text-shadow: none; }
+
+    /* Text Colors */
+    .txt-sys { color: #555; }
+    .txt-intercept { color: #00ff41; }
+    .txt-attack { color: #ff003c; font-weight: bold; }
+    .txt-err { color: #ff9f1c; }
+  </style>
+</head>
+<body>
+  <h1>TRUDY // REPLAY ATTACK NODE</h1>
+  
+  <div>
+    <button class="btn" id="connectBtn" onclick="connectSerial()">[ 1. BIND TO USB RADIO ]</button>
+    <button class="btn btn-attack" onclick="launchAttack()">[ 2. LAUNCH REPLAY ATTACK ]</button>
+  </div>
+
+  <div class="display-box" id="display">
+    <span class="txt-sys">> Awaiting hardware link...</span><br>
+  </div>
+
+  <script>
+    let port;
+    let writer;
+    let displayBox = document.getElementById('display');
+
+    async function connectSerial() {
+      try {
+        port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 115200, dataBits: 8, stopBits: 1, parity: "none" });
+        writer = port.writable.getWriter();
+        document.getElementById('connectBtn').style.display = 'none';
+        
+        appendLog("USB BRIDGE ENGAGED. LISTENING FOR TARGET TRANSMISSIONS...", "txt-sys");
+
+        const textDecoder = new TextDecoderStream();
+        const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+        const reader = textDecoder.readable.getReader();
+        let buffer = "";
+        
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) { reader.releaseLock(); break; }
+          
+          buffer += value;
+          let lines = buffer.split('\n');
+          buffer = lines.pop(); 
+          
+          for (let line of lines) {
+            if (line.trim() !== "") {
+              let cssClass = "txt-intercept";
+              if (line.includes("[ATTACK]")) cssClass = "txt-attack";
+              else if (line.includes("[ERROR]")) cssClass = "txt-err";
+              else if (line.includes("[SYSTEM]")) cssClass = "txt-sys";
+              
+              appendLog(line, cssClass);
+            }
+          }
+        }
+      } catch (error) {
+        appendLog("FATAL ERROR: " + error, "txt-err");
+      }
+    }
+
+    async function launchAttack() {
+      if (!writer) {
+        alert("CRITICAL: Bind to USB Radio first!");
+        return;
+      }
+      
+      // Physically send the "REPLAY" string down the USB cable to trigger the C++ function
+      const command = "REPLAY\n";
+      const encoder = new TextEncoder();
+      await writer.write(encoder.encode(command));
+    }
+
+    function appendLog(text, className) {
+      displayBox.innerHTML += `<span class="${className}">> ${text}</span><br>`;
+      displayBox.scrollTop = displayBox.scrollHeight;
+    }
+  </script>
+</body>
+</html>

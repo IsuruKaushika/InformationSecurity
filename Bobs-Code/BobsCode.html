@@ -1,0 +1,165 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <title>Bob's Terminal</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+    body { font-family: 'Share Tech Mono', monospace; background-color: #050505; color: #e0e1dd; padding: 20px; text-align: center; }
+    h1 { color: #00ff41; letter-spacing: 2px; text-shadow: 0 0 10px rgba(0, 255, 65, 0.5); }
+    
+    .display-box { background-color: #0a0a0a; height: 400px; width: 90%; max-width: 800px; margin: 20px auto; overflow-y: auto; text-align: left; padding: 20px; border-radius: 4px; border: 1px solid #00ff41; box-shadow: inset 0 0 20px rgba(0, 20, 0, 0.8); font-size: 16px; line-height: 1.5; }
+    
+    .input-box { padding: 15px; font-size: 16px; width: 60%; max-width: 500px; border-radius: 4px; border: 1px solid #555; background: #111; color: #fff; font-family: inherit; }
+    .input-box:focus { outline: none; border-color: #00ff41; }
+    
+    .btn { padding: 15px 30px; background-color: transparent; border: 2px solid #00ff41; color: #00ff41; cursor: pointer; border-radius: 4px; font-weight: bold; font-family: inherit; font-size: 16px; transition: 0.3s; }
+    .btn:hover { background-color: #00ff41; color: #000; box-shadow: 0 0 15px #00ff41; }
+    
+    .btn-connect { border-color: #ff9f1c; color: #ff9f1c; display: block; margin: 0 auto 20px auto; width: 300px; box-shadow: 0 0 10px rgba(255, 159, 28, 0.2); }
+    .btn-connect:hover { background-color: #ff9f1c; color: #000; box-shadow: 0 0 20px #ff9f1c; }
+    
+    /* Toggle Switch CSS */
+    .switch-container { margin: 20px; font-size: 18px; display: flex; justify-content: center; align-items: center; gap: 15px; }
+    .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e63946; transition: .4s; border-radius: 34px; box-shadow: 0 0 10px rgba(230, 57, 70, 0.4); }
+    .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+    input:checked + .slider { background-color: #00ff41; box-shadow: 0 0 10px rgba(0, 255, 65, 0.4); }
+    input:checked + .slider:before { transform: translateX(26px); }
+    #modeLabel { color: #e63946; font-weight: bold; }
+
+    /* Terminal Text Colors */
+    .txt-sys { color: #888; }
+    .txt-sent { color: #fff; }
+    .txt-vuln { color: #e63946; }
+    .txt-sec { color: #00ff41; }
+    .txt-err { color: #ff9f1c; text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <h1>BOB'S SECURE TERMINAL</h1>
+  
+  <button class="btn btn-connect" id="connectBtn" onclick="connectSerial()">[ INITIATE USB CONNECTION ]</button>
+
+  <div class="switch-container">
+    <span>Transmission Mode:</span>
+    <label class="switch">
+      <input type="checkbox" id="modeSwitch" onchange="updateLabel()">
+      <span class="slider"></span>
+    </label>
+    <span id="modeLabel">VULNERABLE (PLAINTEXT)</span>
+  </div>
+
+  <div class="display-box" id="display">
+    <span class="txt-sys">> STANDBY: Awaiting hardware bridge connection...</span><br>
+  </div>
+
+  <input type="text" id="msgInput" class="input-box" placeholder="Enter payload (max 16 characters)..." maxlength="16" onkeypress="handleEnter(event)">
+  <button class="btn" onclick="sendMessage()">TRANSMIT</button>
+
+  <script>
+    let port;
+    let writer;
+    let displayBox = document.getElementById('display');
+
+    function updateLabel() {
+      let isSecure = document.getElementById('modeSwitch').checked;
+      let label = document.getElementById('modeLabel');
+      if(isSecure) { 
+        label.innerText = "SECURE (AES-128 + HMAC)"; 
+        label.style.color = "#00ff41"; 
+      } else { 
+        label.innerText = "VULNERABLE (PLAINTEXT)"; 
+        label.style.color = "#e63946"; 
+      }
+    }
+
+    // Allow pressing "Enter" key to send message
+    function handleEnter(event) {
+      if (event.key === "Enter") {
+        sendMessage();
+      }
+    }
+
+    async function connectSerial() {
+      try {
+        // Request port access
+        port = await navigator.serial.requestPort();
+        
+        // Locked-in settings to prevent Framing Errors
+        await port.open({ 
+          baudRate: 115200, 
+          dataBits: 8, 
+          stopBits: 1, 
+          parity: "none" 
+        });
+        
+        writer = port.writable.getWriter();
+        document.getElementById('connectBtn').style.display = 'none';
+        
+        appendLog("USB BRIDGE ESTABLISHED. RADIO TRANSCEIVER ONLINE.", "txt-sys");
+
+        // Read incoming data stream
+        const textDecoder = new TextDecoderStream();
+        const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+        const reader = textDecoder.readable.getReader();
+        let buffer = "";
+        
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) { reader.releaseLock(); break; }
+          
+          buffer += value;
+          let lines = buffer.split('\n');
+          buffer = lines.pop(); // Keep incomplete lines in buffer
+          
+          for (let line of lines) {
+            if (line.trim() !== "") {
+              // Apply colors based on keywords
+              let cssClass = "txt-sys";
+              if (line.includes("[VULNERABLE]")) cssClass = "txt-vuln";
+              else if (line.includes("[SECURE]")) cssClass = "txt-sec";
+              else if (line.includes("[ERROR]")) cssClass = "txt-err";
+              else if (line.includes("[SYSTEM]")) cssClass = "txt-sys";
+              
+              appendLog(line, cssClass);
+            }
+          }
+        }
+      } catch (error) {
+        appendLog("FATAL ERROR: " + error, "txt-err");
+      }
+    }
+
+    async function sendMessage() {
+      if (!writer) {
+        alert("CRITICAL: Hardware bridge not connected. Click 'INITIATE USB CONNECTION' first.");
+        return;
+      }
+      
+      let text = document.getElementById('msgInput').value;
+      if (!text) return; // Don't send empty strings
+      
+      let isSecure = document.getElementById('modeSwitch').checked;
+      let prefix = isSecure ? "SECU" : "VULN";
+      let modeText = isSecure ? "SECURE" : "VULNERABLE";
+      
+      // Print to local screen
+      appendLog(`[TX] YOU SENT: ${text} (${modeText})`, "txt-sent");
+      
+      // Clear the input box
+      document.getElementById('msgInput').value = ""; 
+
+      // Format for the ESP32 and send over USB
+      const command = prefix + ":" + text + "\n";
+      const encoder = new TextEncoder();
+      await writer.write(encoder.encode(command));
+    }
+
+    function appendLog(text, className) {
+      displayBox.innerHTML += `<span class="${className}">> ${text}</span><br>`;
+      displayBox.scrollTop = displayBox.scrollHeight; // Auto-scroll to bottom
+    }
+  </script>
+</body>
+</html>

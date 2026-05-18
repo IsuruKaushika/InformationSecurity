@@ -18,10 +18,14 @@
     /* Text Colors */
     .txt-sys { color: #555; }
     .txt-intercept { color: #00ff41; }
-    .txt-attack { color: #ff003c; font-weight: bold; }
     .txt-err { color: #ff9f1c; }
-    .txt-vuln { color: #ff003c; font-weight: bold; }
-    .txt-sec { color: #ff9f1c; font-weight: bold; }
+    .txt-attack { color: #ff003c; font-weight: bold; }
+    
+    /* Alice (Pink) and Bob (Cyan) - separate colors */
+    .txt-alice-vuln { color: #ff00aa; font-weight: bold; text-shadow: 0 0 10px rgba(255, 0, 170, 0.4); }
+    .txt-alice-sec { color: #aa0077; font-weight: bold; }
+    .txt-bob-vuln { color: #00ffff; font-weight: bold; text-shadow: 0 0 10px rgba(0, 255, 255, 0.4); }
+    .txt-bob-sec { color: #00aaaa; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -39,6 +43,35 @@
     let port;
     let writer;
     let displayBox = document.getElementById('display');
+    let pendingLines = [];
+
+    // Batch DOM updates every 100ms to prevent freezing during data floods
+    setInterval(() => {
+      if (pendingLines.length === 0) return;
+      
+      let fragment = document.createDocumentFragment();
+      for (let item of pendingLines) {
+        const span = document.createElement('span');
+        span.className = item.cssClass;
+        span.textContent = '> ' + item.text;
+        fragment.appendChild(span);
+        fragment.appendChild(document.createElement('br'));
+      }
+      
+      // Limit to 500 lines so it processes even faster
+      if (pendingLines.length > 500) {
+        pendingLines = pendingLines.slice(pendingLines.length - 500); 
+      }
+      
+      pendingLines = [];
+      displayBox.appendChild(fragment);
+      
+      while (displayBox.childElementCount > 500) {
+        displayBox.removeChild(displayBox.firstChild);
+      }
+      
+      displayBox.scrollTop = displayBox.scrollHeight;
+    }, 100);
 
     async function connectSerial() {
       try {
@@ -47,7 +80,7 @@
         writer = port.writable.getWriter();
         document.getElementById('connectBtn').style.display = 'none';
         
-        appendLog("USB BRIDGE ENGAGED. LISTENING FOR TARGET TRANSMISSIONS...", "txt-sys");
+        pendingLines.push({text: "USB BRIDGE ENGAGED. LISTENING FOR TARGET TRANSMISSIONS...", cssClass: "txt-sys"});
 
         const textDecoder = new TextDecoderStream();
         const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
@@ -66,22 +99,21 @@
             if (line.trim() !== "") {
               let cssClass = "txt-sys";
               if (line.includes("[ATTACK]")) cssClass = "txt-attack";
+              else if (line.includes("[ALICE_VULN]")) cssClass = "txt-alice-vuln";
+              else if (line.includes("[ALICE_SECURE]")) cssClass = "txt-alice-sec";
+              else if (line.includes("[BOB_VULN]")) cssClass = "txt-bob-vuln";
+              else if (line.includes("[BOB_SECURE]")) cssClass = "txt-bob-sec";
               else if (line.includes("[ERROR]")) cssClass = "txt-err";
               else if (line.includes("SYSTEM_READY") || line.includes("ENGAGED") || line.includes("WAITING FOR DATA")) cssClass = "txt-sys";
               else if (line.includes("[INTERCEPT]")) cssClass = "txt-intercept";
               
-              appendLog(line, cssClass);
+              pendingLines.push({text: line, cssClass: cssClass});
             }
           }
         }
       } catch (error) {
-        appendLog("FATAL ERROR: " + error, "txt-err");
+        pendingLines.push({text: "FATAL ERROR: " + error, cssClass: "txt-err"});
       }
-    }
-
-    function appendLog(text, className) {
-      displayBox.innerHTML += `<span class="${className}">> ${text}</span><br>`;
-      displayBox.scrollTop = displayBox.scrollHeight;
     }
   </script>
 </body>

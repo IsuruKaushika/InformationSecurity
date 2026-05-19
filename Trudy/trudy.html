@@ -35,7 +35,18 @@
     <button class="btn" id="connectBtn" onclick="connectSerial()">[ BIND TO USB RADIO ]</button>
   </div>
 
-  <div class="display-box" id="display">
+  <div style="display: flex; justify-content: space-around; width: 95%; max-width: 900px; margin: 20px auto 0 auto;">
+    <div class="display-box" style="width: 45%; height: 120px; margin: 0; overflow-y: hidden;">
+      <h3 style="margin-top: 0; color: #ff00aa; border-bottom: 1px solid #ff00aa; font-size: 16px;">ALICE'S LAST MSG</h3>
+      <div id="alice-content"></div>
+    </div>
+    <div class="display-box" style="width: 45%; height: 120px; margin: 0; overflow-y: hidden;">
+      <h3 style="margin-top: 0; color: #00ffff; border-bottom: 1px solid #00ffff; font-size: 16px;">BOB'S LAST MSG</h3>
+      <div id="bob-content"></div>
+    </div>
+  </div>
+
+  <div class="display-box" id="display" style="height: 300px; margin-top: 20px;">
     <span class="txt-sys">> Awaiting hardware link...</span><br>
   </div>
 
@@ -108,6 +119,12 @@
               else if (line.includes("[INTERCEPT]")) cssClass = "txt-intercept";
               
               pendingLines.push({text: line, cssClass: cssClass});
+              
+              if (line.includes("[ALICE_VULN]") || line.includes("[ALICE_SECURE]")) {
+                document.getElementById('alice-content').innerHTML = `<span class="${cssClass}">> ${line}</span>`;
+              } else if (line.includes("[BOB_VULN]") || line.includes("[BOB_SECURE]")) {
+                document.getElementById('bob-content').innerHTML = `<span class="${cssClass}">> ${line}</span>`;
+              }
             }
           }
         }
